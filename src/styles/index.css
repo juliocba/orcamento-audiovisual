@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark }
+
+body { @apply bg-black text-white font-sans }
+
+/* minimal safe styles to match original look */
+.container { @apply max-w-7xl mx-auto p-8 }
