@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { db } from '../firebase/firebase'
+import { jsPDF } from 'jspdf'
 
 const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
@@ -18,6 +19,12 @@ const serviceOptions = [
   { value: '240', label: 'Comercial/Publicidade' },
   { value: '260', label: 'Videoclipe' },
   { value: '270', label: 'Transmissão ao Vivo' },
+]
+
+const mobileQualityOptions = [
+  { value: 'simple', label: 'Conteúdo simples' },
+  { value: 'premium', label: 'Conteúdo premium' },
+  { value: 'cinematic', label: 'Conteúdo cinematográfico' },
 ]
 
 function formatDate(value) {
@@ -110,6 +117,13 @@ export default function CalculatorPage() {
     drone: false,
     locucao: false,
     design: false,
+    mobileCells: '',
+    mobileOperators: '',
+    mobileHours: '',
+    mobileQuality: '',
+    mobileVertical: false,
+    mobileReels: false,
+    mobileExpress: false,
   })
 
   const [summary, setSummary] = useState({ subtotal: 0, custoOperacional: 0, lucro: 0, desconto: 0, valorFinal: 0 })
@@ -230,6 +244,13 @@ export default function CalculatorPage() {
       drone: budget.drone || false,
       locucao: budget.locucao || false,
       design: budget.design || false,
+      mobileCells: String(budget.mobileCells || 0),
+      mobileOperators: String(budget.mobileOperators || 0),
+      mobileHours: String(budget.mobileHours || 0),
+      mobileQuality: budget.mobileQuality || '',
+      mobileVertical: budget.mobileVertical || false,
+      mobileReels: budget.mobileReels || false,
+      mobileExpress: budget.mobileExpress || false,
     })
     setEditingId(budget.id)
     setErrorMessage('')
@@ -262,6 +283,56 @@ export default function CalculatorPage() {
       setErrorMessage('Não foi possível atualizar o pagamento. Tente novamente.')
       setSaveMessage('')
     }
+  }
+
+  const handleGeneratePdf = () => {
+    const doc = new jsPDF()
+    doc.setFontSize(16)
+    doc.text(`Orçamento - ${form.cliente || 'Cliente'}`, 14, 20)
+    doc.setFontSize(12)
+    let y = 30
+    const writeLine = (label, value) => {
+      doc.text(`${label}: ${value}`, 14, y)
+      y += 8
+      if (y > 280) {
+        doc.addPage()
+        y = 20
+      }
+    }
+
+    const serviceLabel = serviceOptions.find((o) => o.value === form.servico)?.label || form.servico || '—'
+
+    writeLine('Cliente', form.cliente || '—')
+    writeLine('Serviço', serviceLabel)
+    writeLine('Horas de gravação', form.horasGravacao || '0')
+    writeLine('Diárias', form.diarias || '0')
+    writeLine('Câmeras', form.cameras || '0')
+    writeLine('Operadores', form.operadores || '0')
+    writeLine('Vídeos finais', form.videosFinais || '0')
+    writeLine('Horas de edição', form.horasEdicao || '0')
+    writeLine('Revisões', form.revisoes || '0')
+    writeLine('Deslocamento (KM)', form.deslocamento || '0')
+    writeLine('Drone', form.drone ? 'Sim' : 'Não')
+    writeLine('Locução', form.locucao ? 'Sim' : 'Não')
+    writeLine('Design/Thumb', form.design ? 'Sim' : 'Não')
+    writeLine('--- Serviço Mobile ---', '')
+    writeLine('Quantidade de celulares', form.mobileCells || '0')
+    writeLine('Operadores mobile', form.mobileOperators || '0')
+    writeLine('Tempo captação mobile', form.mobileHours || '0')
+    writeLine('Qualidade mobile', form.mobileQuality || '—')
+    writeLine('Vertical', form.mobileVertical ? 'Sim' : 'Não')
+    writeLine('Edição para Reels', form.mobileReels ? 'Sim' : 'Não')
+    writeLine('Entrega Rápida', form.mobileExpress ? 'Sim' : 'Não')
+
+    writeLine('')
+    writeLine('Subtotal', summary.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
+    writeLine('Custo Operacional', summary.custoOperacional.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
+    writeLine('Lucro', summary.lucro.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
+    writeLine('Desconto', summary.desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
+    writeLine('Valor Final', summary.valorFinal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
+
+    const fileName = `orcamento_${(form.cliente || 'cliente').replace(/\s+/g, '_')}.pdf`
+    doc.save(fileName)
   }
 
   useEffect(() => {
@@ -317,6 +388,13 @@ export default function CalculatorPage() {
       drone,
       locucao,
       design,
+      mobileCells,
+      mobileOperators,
+      mobileHours,
+      mobileQuality,
+      mobileVertical,
+      mobileReels,
+      mobileExpress,
     } = form
 
     const custoServico = Number(servico)
@@ -332,6 +410,14 @@ export default function CalculatorPage() {
     const custoLocucao = locucao ? 260 : 0
     const custoDesign = design ? 190 : 0
 
+    const custoMobileCells = Number(mobileCells) * 120
+    const custoMobileOperators = Number(mobileOperators) * 110
+    const custoMobileHours = Number(mobileHours) * 90
+    const custoMobileQuality = mobileQuality === 'premium' ? 180 : mobileQuality === 'cinematic' ? 320 : 0
+    const custoMobileVertical = mobileVertical ? 70 : 0
+    const custoMobileReels = mobileReels ? 140 : 0
+    const custoMobileExpress = mobileExpress ? 220 : 0
+
     const subtotal =
       custoServico +
       custoHoras +
@@ -344,7 +430,14 @@ export default function CalculatorPage() {
       custoDeslocamento +
       custoDrone +
       custoLocucao +
-      custoDesign
+      custoDesign +
+      custoMobileCells +
+      custoMobileOperators +
+      custoMobileHours +
+      custoMobileQuality +
+      custoMobileVertical +
+      custoMobileReels +
+      custoMobileExpress
 
     const custoOperacional = subtotal * 0.25
     const lucro = subtotal * 0.2
@@ -514,6 +607,64 @@ export default function CalculatorPage() {
               </label>
             </div>
 
+            <div className="mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-5">
+              <h3 className="text-lg font-semibold mb-4 text-orange-500">Serviço Mobile</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FloatingInput
+                  label="Quantidade de celulares"
+                  name="mobileCells"
+                  type="number"
+                  min="0"
+                  value={form.mobileCells}
+                  onChange={handleChange}
+                />
+
+                <FloatingInput
+                  label="Operadores mobile"
+                  name="mobileOperators"
+                  type="number"
+                  min="0"
+                  value={form.mobileOperators}
+                  onChange={handleChange}
+                />
+
+                <FloatingInput
+                  label="Tempo de captação mobile"
+                  name="mobileHours"
+                  type="number"
+                  min="0"
+                  value={form.mobileHours}
+                  onChange={handleChange}
+                />
+
+                <FloatingSelect
+                  label="Qualidade da entrega"
+                  name="mobileQuality"
+                  value={form.mobileQuality}
+                  onChange={handleChange}
+                  options={mobileQualityOptions}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                <label className="bg-zinc-900 rounded-xl p-4 flex items-center justify-between">
+                  Captação Vertical
+                  <input name="mobileVertical" type="checkbox" checked={form.mobileVertical} onChange={handleChange} />
+                </label>
+
+                <label className="bg-zinc-900 rounded-xl p-4 flex items-center justify-between">
+                  Edição para Reels
+                  <input name="mobileReels" type="checkbox" checked={form.mobileReels} onChange={handleChange} />
+                </label>
+
+                <label className="bg-zinc-900 rounded-xl p-4 flex items-center justify-between">
+                  Entrega Rápida
+                  <input name="mobileExpress" type="checkbox" checked={form.mobileExpress} onChange={handleChange} />
+                </label>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={handleSave}
@@ -571,7 +722,7 @@ export default function CalculatorPage() {
             </div>
 
             <div className="mt-8 space-y-4">
-              <button className="w-full bg-white text-black py-4 rounded-2xl font-semibold hover:scale-105 transition-all">Gerar PDF</button>
+              <button type="button" onClick={handleGeneratePdf} className="w-full bg-white text-black py-4 rounded-2xl font-semibold hover:scale-105 transition-all">Gerar PDF</button>
 
               <button className="w-full bg-zinc-700 py-4 rounded-2xl font-semibold hover:bg-zinc-600 transition-all">Salvar Orçamento</button>
             </div>

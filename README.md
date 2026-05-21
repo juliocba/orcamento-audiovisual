@@ -24,3 +24,8 @@ Deploy:
 
 - Recomendo conectar o repositório à Vercel e definir variáveis de ambiente no painel do Vercel.
 
+Documentação do projeto:
+
+- Leia `AGENTS.md` para contexto operacional permanente.
+- Leia `docs/domain-spec.md` para a especificação de domínio extraída do código atual.
+
